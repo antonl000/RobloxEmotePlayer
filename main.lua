@@ -656,6 +656,11 @@ PauseButton.MouseButton1Click:Connect(function()
 	end
 end)
 
+ReturnBack.MouseButton1Click:Connect(function()
+	MainFrame.Visible = true
+	ReturnBack.Visible = false
+end)
+
 humanoid.Died:Connect(function()
 	if lastPreviewDummy ~= nil then
 		lastPreviewDummy:Destroy()
