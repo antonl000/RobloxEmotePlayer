@@ -461,6 +461,11 @@ CloseButton.MouseButton1Click:Connect(function()
 	script:Destroy()
 end)
 
+ReturnButton.MouseButton1Click:Connect(function()
+	MainFrame.Visible = true
+	ReturnButton.Visible = false
+end)
+
 local function changeAnimationsDummyState(state, dummyAnimator)
 	if state == "Play" then
 		local animationTrack = dummyAnimator:LoadAnimation(selectedAnimation)
@@ -654,11 +659,6 @@ PauseButton.MouseButton1Click:Connect(function()
 			end
 		end
 	end
-end)
-
-ReturnBack.MouseButton1Click:Connect(function()
-	MainFrame.Visible = true
-	ReturnBack.Visible = false
 end)
 
 humanoid.Died:Connect(function()
