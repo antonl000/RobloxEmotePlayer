@@ -412,7 +412,7 @@ EmotesGUI:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
 end)
 
 local function dragify(Frame)
-	local startPos
+	local startPos = nil
 	local dragToggle = nil
 	local dragSpeed = 0
 	local dragInput = nil
