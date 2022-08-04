@@ -396,7 +396,7 @@ local animator = humanoid:WaitForChild("Animator")
 local idsUrl = "https://raw.githubusercontent.com/antonl000/AllRobloxEmotesID/main/ids.lua"
 local getUrlText = game:HttpGet(idsUrl, true)
 local urlIdTable = getUrlText:split("||")
-local idsTable = { }
+local idsTable = nil
 
 game:GetObjects("rbxassetid://10197907710")[1].Parent = EmotesGUI --Preview dummy
 local previewDummy = EmotesGUI:WaitForChild("AnimationNPCDummy")
