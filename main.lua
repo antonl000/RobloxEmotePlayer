@@ -216,7 +216,7 @@ WarningEmote.BorderSizePixel = 0
 WarningEmote.Position = UDim2.new(0.550949931, 0, 0.406995237, 0)
 WarningEmote.Size = UDim2.new(0.278065622, 0, 0.184419706, 0)
 WarningEmote.Font = Enum.Font.GothamMedium
-WarningEmote.Text = "No emote selected!"
+WarningEmote.Text = "Searching cache..."
 WarningEmote.TextColor3 = Color3.fromRGB(232, 232, 232)
 WarningEmote.TextScaled = true
 WarningEmote.TextSize = 14.000
@@ -361,14 +361,16 @@ AspectRatio_2.Name = "AspectRatio"
 AspectRatio_2.Parent = ReturnButton
 AspectRatio_2.AspectRatio = 1.000
 
+task.wait(1)
 
 --[[ SCRIPTS ]]--
-
 local disableButtons = true
 local isPaused = false
 local selectedAnimation = nil
 local lastAnimationTrack = nil
 local lastPreviewDummy = nil
+
+local emotesFullyCached = false
 
 local selectedColors =
 	{
@@ -398,6 +400,15 @@ local getUrlText = game:HttpGet(idsUrl, true)
 local urlIdTable = getUrlText:split("||")
 local idsTable = { }
 
+for _, v in pairs(urlIdTable) do
+	if tonumber(v) ~= nil then
+		table.insert(idsTable, tonumber(v))
+	end
+end
+
+local howManyIds = #idsTable
+local animationsLoaded = 0
+
 game:GetObjects("rbxassetid://10197907710")[1].Parent = EmotesGUI --Preview dummy
 local previewDummy = EmotesGUI:WaitForChild("AnimationNPCDummy")
 for _, v in pairs(humanoid:GetChildren()) do
@@ -407,12 +418,41 @@ for _, v in pairs(humanoid:GetChildren()) do
 	end
 end
 
+local findExistingCache = replicatedStorage:FindFirstChild("antonl000/RobloxEmotePlayer")
+local emotesCache = nil
+
+local function makeCacheFolder()
+	local folder = Instance.new("Folder")
+	folder.Name = "antonl000/RobloxEmotePlayer"
+	folder.Parent = replicatedStorage
+	emotesCache = folder
+end
+
+if not findExistingCache then
+	makeCacheFolder()
+	WarningEmote.Text = "Making cache folder..."
+else
+	if howManyIds ~= #findExistingCache:GetChildren() then
+		WarningEmote.Text = "Cache folder corrupted."
+		task.wait(1)
+		WarningEmote.Text = "Remaking cache folder..."
+		findExistingCache:Destroy()
+		makeCacheFolder()
+	else
+		emotesFullyCached = true
+		emotesCache = findExistingCache
+		WarningEmote.Text = "Found cache folder."
+		task.wait(1)
+		WarningEmote.Text = "Adding emotes..."
+	end
+end
+
 EmotesGUI:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
 	TextSizeDescription.MaxTextSize = 21 * (EmotesGUI.AbsoluteSize.X / 1920)
 end)
 
 local function dragify(Frame)
-	local startPos = nil
+	local startPos
 	local dragToggle = nil
 	local dragSpeed = 0
 	local dragInput = nil
@@ -478,15 +518,6 @@ local function changeAnimationsDummyState(state, dummyAnimator)
 	end
 end
 
-for _, v in pairs(urlIdTable) do
-	if tonumber(v) ~= nil then
-		table.insert(idsTable, tonumber(v))
-	end
-end
-
-local howManyIds = #idsTable
-local animationsLoaded = 0
-
 local function resetSelected(buttonToSelect)
 	for _, v in pairs(EmoteScrollingFrame:GetChildren()) do
 		if v:IsA("TextButton") then
@@ -496,57 +527,92 @@ local function resetSelected(buttonToSelect)
 	buttonToSelect.BackgroundColor3 = selectedColors.selected
 end
 
-local function createButton(id)
-	local emoteInfo = nil
-	local animationId = nil
-	local successRequest = nil
 
-	local function loadName()
-		local success = pcall(function()
-			emoteInfo = marketplaceService:GetProductInfo(id)
-		end)
-		if success == false then
-			successRequest = false
-		else
-			successRequest = true
+local function createButton(id, offline, offlineName, offlineDescription, offlinePrice, offlineAnimationId)
+	if not offline then
+		local name = nil
+		local description = nil
+		local price = nil
+		local animationId = nil
+		
+		local emoteInfo = nil
+		local successRequest = nil
+
+		local function loadName()
+			local success = pcall(function()
+				emoteInfo = marketplaceService:GetProductInfo(id)
+
+				name = emoteInfo["Name"]
+				description = emoteInfo["Description"]
+				price = emoteInfo["PriceInRobux"]
+
+			end)
+			if success == false then
+				successRequest = false
+			else
+				successRequest = true
+			end
 		end
-	end
 
-	loadName()
+		loadName()
 
-	if successRequest == false then
-		repeat
-			loadName()
-		until successRequest == true
-	end
-
-	if emoteInfo["Name"] ~= nil then
-		local clonedEmoteButton = EmoteButton:Clone()
-		clonedEmoteButton.Parent = EmoteScrollingFrame
-		clonedEmoteButton.Name = emoteInfo["Name"]
-		clonedEmoteButton.Active = true
-		clonedEmoteButton.Visible = true
-		clonedEmoteButton.Text = emoteInfo["Name"]
+		if successRequest == false then
+			repeat
+				loadName()
+			until successRequest == true
+		end
 
 		local animation = Instance.new("Animation")
-		animation.Name = tostring(animationId)
+		animation.Name = "antonl000/RobloxEmotePlayer"
 		animation.AnimationId = game:GetObjects("rbxassetid://"..tostring(id))[1].AnimationId
 
+		local emoteFolder = Instance.new("Folder")
+		emoteFolder.Parent = emotesCache
+		emoteFolder.Name = name
+
+		local nameValue = Instance.new("StringValue")
+		nameValue.Parent = emoteFolder
+		nameValue.Name = "Emote_Name"
+		nameValue.Value = name
+		local descriptionValue = Instance.new("StringValue")
+		descriptionValue.Parent = emoteFolder
+		descriptionValue.Name = "Description"
+		descriptionValue.Value = description
+		local animationIdValue = Instance.new("StringValue")
+		animationIdValue.Parent = emoteFolder
+		animationIdValue.Name = "Animation_ID"
+		animationIdValue.Value = animation.AnimationId
+		local priceValue = Instance.new("IntValue")
+		priceValue.Parent = emoteFolder
+		priceValue.Name = "Price"
+		if price then
+			priceValue.Value = price
+		else
+			priceValue.Value = -1
+		end
+		
+		local clonedEmoteButton = EmoteButton:Clone()
+		clonedEmoteButton.Parent = EmoteScrollingFrame
+		clonedEmoteButton.Name = name
+		clonedEmoteButton.Active = true
+		clonedEmoteButton.Visible = true
+		clonedEmoteButton.Text = name
+		
 		clonedEmoteButton.MouseButton1Click:Connect(function()
-			NameLabel.Text = "Name: "..emoteInfo["Name"]
-			
-			if emoteInfo["Description"] ~= nil then
-				DescriptionLabel.Text = "Description: "..emoteInfo["Description"]
+			NameLabel.Text = "Name: "..name
+
+			if description ~= nil then
+				DescriptionLabel.Text = "Description: "..description
 			else
 				DescriptionLabel.Text = "This emote doesn't have a description."
 			end
-			
-			if emoteInfo["PriceInRobux"] == nil then
-				PriceLabel.Text = "Price: Free"
+
+			if price == -1 then
+				PriceLabel.Text = "Price: Free / Offsale"
 			else
-				PriceLabel.Text = "Price: "..tostring(emoteInfo["PriceInRobux"].." ROBUX")
+				PriceLabel.Text = "Price: "..tostring(price).." ROBUX"
 			end
-			
+
 			if disableButtons == false then
 				if selectedAnimation == nil then
 					WarningEmote.Visible = false
@@ -560,7 +626,7 @@ local function createButton(id)
 				end
 
 				resetSelected(clonedEmoteButton)
-				
+
 				selectedAnimation = animation
 			end
 		end)
@@ -568,17 +634,76 @@ local function createButton(id)
 		animationsLoaded += 1
 
 		WarningEmote.Text = "Loading Emotes... "..tostring(animationsLoaded).." out of "..tostring(howManyIds)
+		
+		
+	else
+		local animation = Instance.new("Animation")
+		animation.Name = "antonl000/RobloxEmotePlayer"
+		animation.AnimationId = offlineAnimationId
+		
+		local clonedEmoteButton = EmoteButton:Clone()
+		clonedEmoteButton.Parent = EmoteScrollingFrame
+		clonedEmoteButton.Name = offlineName
+		clonedEmoteButton.Active = true
+		clonedEmoteButton.Visible = true
+		clonedEmoteButton.Text = offlineName
+
+		clonedEmoteButton.MouseButton1Click:Connect(function()
+			NameLabel.Text = "Name: "..offlineName
+
+			if offlineDescription ~= nil then
+				DescriptionLabel.Text = "Description: "..offlineDescription
+			else
+				DescriptionLabel.Text = "This emote doesn't have a description."
+			end
+
+			if offlinePrice == -1 then
+				PriceLabel.Text = "Price: Free / Offsale"
+			else
+				PriceLabel.Text = "Price: "..offlinePrice.." ROBUX"
+			end
+
+			if disableButtons == false then
+				if selectedAnimation == nil then
+					WarningEmote.Visible = false
+					PlayButton.Visible = true
+					StopButton.Visible = true
+					PlayPreview.Visible = true
+					PauseButton.Visible = true
+					NameLabel.Visible = true
+					DescriptionLabel.Visible = true
+					PriceLabel.Visible = true
+				end
+
+				resetSelected(clonedEmoteButton)
+
+				selectedAnimation = animation
+			end
+		end)
 	end
 end
 
-for _, v in pairs(idsTable) do
-	createButton(v)
+if emotesFullyCached then
+	for _, v in pairs(emotesCache:GetChildren()) do
+		local name = v.Emote_Name.Value
+		local description = v.Description.Value
+		local price = v.Price.Value
+		local animationId = v.Animation_ID.Value
+		createButton(nil, true, name, description, price, animationId)
+	end
+	WarningEmote.Text = "Emotes loaded."
+	task.wait(1)
+	WarningEmote.Text = "No emote selected."
+else
+	for _, v in pairs(idsTable) do
+		createButton(v)
 
-	if animationsLoaded == howManyIds then
-		task.wait(2)
-		WarningEmote.Text = "Emotes loaded."
-		task.wait(2)
-		WarningEmote.Text = "No emote selected."
+		if animationsLoaded == howManyIds then
+			task.wait(2)
+			WarningEmote.Text = "Emotes loaded."
+			task.wait(2)
+			WarningEmote.Text = "No emote selected."
+		end
 	end
 end
 
@@ -592,7 +717,7 @@ PlayButton.MouseButton1Click:Connect(function()
 		lastAnimationTrack.Name = "EmotesGUIAnimation"
 		lastAnimationTrack:Play()
 	end
-	
+
 	if isPaused == true then
 		for _, v in pairs(animator:GetPlayingAnimationTracks()) do
 			if v.Name == "EmotesGUIAnimation" then
@@ -621,7 +746,7 @@ PlayPreview.MouseButton1Click:Connect(function()
 		clonedDummy.Parent = workspace
 		clonedDummy:SetPrimaryPartCFrame(HRP.CFrame * CFrame.new(Vector3.new(0, 0, -10)))
 		clonedDummy:SetPrimaryPartCFrame(clonedDummy.HumanoidRootPart.CFrame * CFrame.Angles(math.rad(180), 0, math.rad(180)))
-		
+
 		local hitBoxStopPreview = Instance.new("Part")
 		hitBoxStopPreview.Parent = clonedDummy
 		hitBoxStopPreview.Name = "Hitbox"
@@ -631,7 +756,7 @@ PlayPreview.MouseButton1Click:Connect(function()
 		hitBoxStopPreview.CanCollide = false
 		hitBoxStopPreview.Anchored = true
 		hitBoxStopPreview.Transparency = 1
-		
+
 		hitBoxStopPreview.TouchEnded:Connect(function(part)
 			if part.Name == "HumanoidRootPart" and part.Parent == character then
 				PlayPreview.Text = previewButton.stoppedText
@@ -639,13 +764,13 @@ PlayPreview.MouseButton1Click:Connect(function()
 				changeAnimationsDummyState("Stop", lastPreviewDummy.Humanoid.Animator)
 			end
 		end)
-		
+
 		changeAnimationsDummyState("Play", clonedDummy.Humanoid.Animator)
 
 		lastPreviewDummy = clonedDummy
 	else
 		PlayPreview.Text = previewButton.stoppedText
-		
+
 		changeAnimationsDummyState("Stop", lastPreviewDummy.Humanoid.Animator)
 	end
 end)
